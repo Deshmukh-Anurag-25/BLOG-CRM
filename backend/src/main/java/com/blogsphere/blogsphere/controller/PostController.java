@@ -1,4 +1,24 @@
 package com.blogsphere.blogsphere.controller;
 
+import com.blogsphere.blogsphere.dto.PostRequest;
+import com.blogsphere.blogsphere.model.Post;
+import com.blogsphere.blogsphere.service.PostService;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/posts")
 public class PostController {
+
+    private final PostService postService;
+
+    public PostController(PostService postService){
+        this.postService = postService;
+    }
+
+    @PostMapping
+    public Post createPost(@RequestBody PostRequest request){
+        return postService.createPost(request);
+    }
 }
