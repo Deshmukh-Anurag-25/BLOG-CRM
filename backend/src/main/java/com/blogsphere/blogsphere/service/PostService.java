@@ -7,6 +7,8 @@ import com.blogsphere.blogsphere.repository.PostRepository;
 import com.blogsphere.blogsphere.repository.UserRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
+
 @Service
 public class PostService {
 
@@ -29,5 +31,14 @@ public class PostService {
         post.setAuthor(author);
 
         return postRepository.save(post);
+    }
+
+    public List<Post> getAll(){
+        return postRepository.findAll();
+    }
+
+    public Post getPostById(Long id){
+        return postRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
     }
 }
