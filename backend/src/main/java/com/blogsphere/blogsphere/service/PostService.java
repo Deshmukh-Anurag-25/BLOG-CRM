@@ -1,0 +1,59 @@
+package com.blogsphere.blogsphere.service;
+
+import com.blogsphere.blogsphere.dto.PostRequest;
+import com.blogsphere.blogsphere.model.Post;
+import com.blogsphere.blogsphere.model.User;
+import com.blogsphere.blogsphere.repository.PostRepository;
+import com.blogsphere.blogsphere.repository.UserRepository;
+import org.springframework.stereotype.Service;
+
+import java.util.List;
+
+@Service
+public class PostService {
+
+    private final PostRepository postRepository;
+    private final UserRepository userRepository;
+
+    public PostService(PostRepository postRepository, UserRepository userRepository){
+        this.postRepository = postRepository;
+        this.userRepository = userRepository;
+    }
+
+    public Post createPost(PostRequest request){
+        Post post = new Post();
+        post.setTitle(request.getTitle());
+        post.setSlug(request.getSlug());
+        post.setContent(request.getContent());
+        post.setExcerpt(request.getExcerpt());
+
+        User author = userRepository.findById(1L).orElseThrow();
+        post.setAuthor(author);
+
+        return postRepository.save(post);
+    }
+
+    public List<Post> getAll(){
+        return postRepository.findAll();
+    }
+
+    public Post getPostById(Long id){
+        return postRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
+    }
+
+    public Post updatePost(Long id, PostRequest request){
+        Post post = getPostById(id);
+
+        post.setTitle(request.getTitle());
+        post.setSlug(request.getSlug());
+        post.setContent(request.getContent());
+        post.setExcerpt(request.getExcerpt());
+        return postRepository.save(post);
+    }
+
+    public void deletePost(Long id){
+        Post post = getPostById(id);
+        postRepository.delete(post);
+    }
+}
