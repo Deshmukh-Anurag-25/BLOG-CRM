@@ -2,6 +2,7 @@ package com.blogsphere.blogsphere.controller;
 
 import com.blogsphere.blogsphere.dto.PostRequest;
 import com.blogsphere.blogsphere.model.Post;
+import com.blogsphere.blogsphere.model.Revision;
 import com.blogsphere.blogsphere.service.PostService;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,5 +41,25 @@ public class PostController {
     @DeleteMapping("/{id}")
     public void deletePost(@PathVariable Long id){
         postService.deletePost(id);
+    }
+
+    @PostMapping("/{id}/publish")
+    public Post publishPost(@PathVariable Long id) {
+        return postService.publishPost(id);
+    }
+
+    @PostMapping("/{id}/unpublish")
+    public Post unpublishPost(@PathVariable Long id) {
+        return postService.unpublishPost(id);
+    }
+
+    @PostMapping("/{id}/archive")
+    public Post archivePost(@PathVariable Long id) {
+        return postService.archivePost(id);
+    }
+
+    @GetMapping("/{id}/revisions")
+    public List<Revision> getRevisions(@PathVariable Long id) {
+        return postService.getRevisions(id);
     }
 }

@@ -1,42 +1,23 @@
 package com.blogsphere.blogsphere.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+
 @Entity
-@Table(name = "users")
+@Table(name = "comments")
 @Getter
 @Setter
-public class User {
+public class Comments {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String username;
-
-    @Column(unique = true, nullable = false)
-    private String email;
-
-    @Column(nullable = false)
-    @JsonIgnore
-    private String password;
-
-    private String displayName;
-
     @Column(columnDefinition = "TEXT")
-    private String bio;
-
-    private String profileImageUrl;
-
-    @Enumerated(EnumType.STRING)
-    private UserStatus status = UserStatus.ACTIVE;
+    private String content;
 
     private LocalDateTime createdAt;
 
@@ -55,4 +36,12 @@ public class User {
     protected void onUpdate(){
         updatedAt = LocalDateTime.now();
     }
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", nullable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
 }

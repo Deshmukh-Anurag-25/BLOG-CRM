@@ -1,42 +1,31 @@
 package com.blogsphere.blogsphere.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
-@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+
 @Entity
-@Table(name = "users")
 @Getter
 @Setter
-public class User {
+@Table(name = "pages")
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+public class Page {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true, nullable = false)
-    private String username;
-
-    @Column(unique = true, nullable = false)
-    private String email;
-
     @Column(nullable = false)
-    @JsonIgnore
-    private String password;
+    private String title;
 
-    private String displayName;
+    @Column(unique = true, nullable = false)
+    private String slug;
 
     @Column(columnDefinition = "TEXT")
-    private String bio;
-
-    private String profileImageUrl;
-
-    @Enumerated(EnumType.STRING)
-    private UserStatus status = UserStatus.ACTIVE;
+    private String content;
 
     private LocalDateTime createdAt;
 
@@ -55,4 +44,7 @@ public class User {
     protected void onUpdate(){
         updatedAt = LocalDateTime.now();
     }
+
+    @Enumerated(EnumType.STRING)
+    private PageStatus status = PageStatus.DRAFT;
 }
