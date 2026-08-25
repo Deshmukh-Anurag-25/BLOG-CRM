@@ -32,6 +32,9 @@ public class Post {
     @Column(nullable = false)
     private String excerpt;
 
+    @Version
+    private Long version;
+
     private String featuredMediaUrl;
 
     private LocalDateTime createdAt;
