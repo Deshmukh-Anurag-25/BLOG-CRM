@@ -40,6 +40,8 @@ public class Post {
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+    
+    private LocalDateTime scheduledAt;
 
     @Enumerated(EnumType.STRING)
     private PostStatus status = PostStatus.DRAFT;

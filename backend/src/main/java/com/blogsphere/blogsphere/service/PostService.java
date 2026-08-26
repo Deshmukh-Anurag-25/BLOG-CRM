@@ -1,10 +1,12 @@
 package com.blogsphere.blogsphere.service;
 
+import com.blogsphere.blogsphere.dto.AutosaveRequest;
 import com.blogsphere.blogsphere.dto.PostRequest;
 import com.blogsphere.blogsphere.model.*;
 import com.blogsphere.blogsphere.repository.*;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -100,5 +102,19 @@ public class PostService {
 
     public List<Revision> getRevisions(Long postId) {
         return revisionRepository.findByPostIdOrderByCreatedAtDesc(postId);
+    }
+
+    public Post autosavePost(Long id, AutosaveRequest request) {
+        Post post = getPostById(id);
+        post.setTitle(request.getTitle());
+        post.setContent(request.getContent());
+        return postRepository.save(post);
+    }
+
+    public Post schedulePost(Long id, LocalDateTime scheduledAt) {
+        Post post = getPostById(id);
+        post.setScheduledAt(scheduledAt);
+        post.setStatus(PostStatus.SCHEDULED);
+        return postRepository.save(post);
     }
 }
