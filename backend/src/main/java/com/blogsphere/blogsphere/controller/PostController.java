@@ -1,11 +1,14 @@
 package com.blogsphere.blogsphere.controller;
 
+import com.blogsphere.blogsphere.dto.AutosaveRequest;
 import com.blogsphere.blogsphere.dto.PostRequest;
+import com.blogsphere.blogsphere.dto.ScheduleRequest;
 import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.Revision;
 import com.blogsphere.blogsphere.service.PostService;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @RestController
@@ -61,5 +64,15 @@ public class PostController {
     @GetMapping("/{id}/revisions")
     public List<Revision> getRevisions(@PathVariable Long id) {
         return postService.getRevisions(id);
+    }
+
+    @PatchMapping("/{id}/autosave")
+    public Post autosavePost(@PathVariable Long id, @RequestBody AutosaveRequest request) {
+        return postService.autosavePost(id, request);
+    }
+
+    @PostMapping("/{id}/schedule")
+    public Post schedulePost(@PathVariable Long id, @RequestBody ScheduleRequest request) {
+        return postService.schedulePost(id, request.getScheduledAt());
     }
 }
