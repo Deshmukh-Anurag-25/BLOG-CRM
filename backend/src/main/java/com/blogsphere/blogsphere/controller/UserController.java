@@ -3,6 +3,7 @@ package com.blogsphere.blogsphere.controller;
 import com.blogsphere.blogsphere.dto.UserRequest;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.service.UserService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class UserController {
     }
 
     @PostMapping
-    public User createUser(@RequestBody UserRequest request){
+    public User createUser(@Valid @RequestBody UserRequest request){
         return userService.createUser(request);
     }
 
@@ -30,5 +31,15 @@ public class UserController {
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id){
         return userService.getUserById(id);
+    }
+
+    @PatchMapping("/{id}")
+    public User updateUser(@PathVariable Long id, @RequestBody UserRequest request) {
+        return userService.updateUser(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteUser(@PathVariable Long id) {
+        userService.deleteUser(id);
     }
 }
