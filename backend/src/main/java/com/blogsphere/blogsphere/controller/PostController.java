@@ -6,6 +6,7 @@ import com.blogsphere.blogsphere.dto.ScheduleRequest;
 import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.Revision;
 import com.blogsphere.blogsphere.service.PostService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -22,7 +23,7 @@ public class PostController {
     }
 
     @PostMapping
-    public Post createPost(@RequestBody PostRequest request){
+    public Post createPost(@Valid @RequestBody PostRequest request){
         return postService.createPost(request);
     }
 
@@ -36,7 +37,7 @@ public class PostController {
         return postService.getPostById(id);
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public Post updatePost(@PathVariable Long id, @RequestBody PostRequest request){
         return postService.updatePost(id, request);
     }

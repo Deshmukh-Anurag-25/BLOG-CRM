@@ -1,6 +1,7 @@
 package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.dto.CategoryRequest;
+import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.Category;
 import com.blogsphere.blogsphere.repository.CategoryRepository;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,24 @@ public class CategoryService {
 
     public Category getCategoryById(Long id){
         return categoryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Category not found" + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found with id: " + id));
+    }
+
+    public Category updateCategory(Long id, CategoryRequest request) {
+        Category category = getCategoryById(id);
+
+        if (request.getName() != null) {
+            category.setName(request.getName());
+        }
+        if (request.getSlug() != null) {
+            category.setSlug(request.getSlug());
+        }
+
+        return categoryRepository.save(category);
+    }
+
+    public void deleteCategory(Long id) {
+        Category category = getCategoryById(id);
+        categoryRepository.delete(category);
     }
 }
