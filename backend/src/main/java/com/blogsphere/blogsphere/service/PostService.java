@@ -2,6 +2,7 @@ package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.dto.AutosaveRequest;
 import com.blogsphere.blogsphere.dto.PostRequest;
+import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.*;
 import com.blogsphere.blogsphere.repository.*;
 import org.springframework.stereotype.Service;
@@ -58,7 +59,7 @@ public class PostService {
 
     public Post getPostById(Long id){
         return postRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Post not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + id));
     }
 
     public Post updatePost(Long id, PostRequest request){
@@ -71,9 +72,28 @@ public class PostService {
         revision.setEditedBy(userRepository.findById(1L).orElseThrow());
         revisionRepository.save(revision);
 
-        post.setTitle(request.getTitle());
-        post.setSlug(request.getSlug());
-        post.setContent(request.getContent());
+        if (request.getTitle() != null) {
+            post.setTitle(request.getTitle());
+        }
+        if (request.getSlug() != null) {
+            post.setSlug(request.getSlug());
+        }
+        if (request.getContent() != null) {
+            post.setContent(request.getContent());
+        }
+        if (request.getExcerpt() != null) {
+            post.setExcerpt(request.getExcerpt());
+        }
+        if (request.getCategoryId() != null) {
+            Category category = categoryRepository.findById(request.getCategoryId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
+            post.setCategory(category);
+        }
+        if (request.getTagIds() != null) {
+            Set<Tags> tags = new HashSet<>(tagRepository.findAllById(request.getTagIds()));
+            post.setTags(tags);
+        }
+
         return postRepository.save(post);
     }
 
