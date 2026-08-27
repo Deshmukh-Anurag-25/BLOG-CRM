@@ -3,6 +3,7 @@ package com.blogsphere.blogsphere.controller;
 import com.blogsphere.blogsphere.dto.TagRequest;
 import com.blogsphere.blogsphere.model.Tags;
 import com.blogsphere.blogsphere.service.TagService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class TagController {
     }
 
     @PostMapping
-    public Tags createTag(@RequestBody TagRequest request){
+    public Tags createTag(@Valid @RequestBody TagRequest request){
         return tagService.createTag(request);
     }
 
@@ -30,5 +31,15 @@ public class TagController {
     @GetMapping("/{id}")
     public Tags getTagById(@PathVariable Long id){
         return tagService.getTagById(id);
+    }
+
+    @PatchMapping("/{id}")
+    public Tags updateTag(@PathVariable Long id, @RequestBody TagRequest request) {
+        return tagService.updateTag(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteTag(@PathVariable Long id) {
+        tagService.deleteTag(id);
     }
 }
