@@ -1,6 +1,7 @@
 package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.dto.UserRequest;
+import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.UserRepository;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,30 @@ public class UserService {
 
     public User getUserById(Long id){
         return userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User with this id is not found" + id));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+    }
+
+    public User updateUser(Long id, UserRequest request) {
+        User user = getUserById(id);
+
+        if (request.getUsername() != null) {
+            user.setUsername(request.getUsername());
+        }
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
+        }
+        if (request.getDisplayName() != null) {
+            user.setDisplayName(request.getDisplayName());
+        }
+        if (request.getBio() != null) {
+            user.setBio(request.getBio());
+        }
+
+        return userRepository.save(user);
+    }
+
+    public void deleteUser(Long id) {
+        User user = getUserById(id);
+        userRepository.delete(user);
     }
 }

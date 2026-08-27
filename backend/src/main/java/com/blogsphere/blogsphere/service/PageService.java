@@ -1,6 +1,7 @@
 package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.dto.PageRequest;
+import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.Page;
 import com.blogsphere.blogsphere.model.PageStatus;
 import com.blogsphere.blogsphere.repository.PageRepository;
@@ -32,14 +33,22 @@ public class PageService {
 
     public Page getPageById(Long id) {
         return pageRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Page not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Page not found with id: " + id));
     }
 
     public Page updatePage(Long id, PageRequest request) {
         Page page = getPageById(id);
-        page.setTitle(request.getTitle());
-        page.setSlug(request.getSlug());
-        page.setContent(request.getContent());
+
+        if (request.getTitle() != null) {
+            page.setTitle(request.getTitle());
+        }
+        if (request.getSlug() != null) {
+            page.setSlug(request.getSlug());
+        }
+        if (request.getContent() != null) {
+            page.setContent(request.getContent());
+        }
+
         return pageRepository.save(page);
     }
 

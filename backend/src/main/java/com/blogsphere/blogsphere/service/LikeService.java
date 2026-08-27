@@ -1,5 +1,6 @@
 package com.blogsphere.blogsphere.service;
 
+import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.Like;
 import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.User;
@@ -26,8 +27,10 @@ public class LikeService {
             throw new RuntimeException("Already Liked");
         }
 
-        User user = userRepository.findById(1L).orElseThrow();
-        Post post = postRepository.findById(postId).orElseThrow();
+        User user = userRepository.findById(1L)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Post post = postRepository.findById(postId)
+                .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
         Like like = new Like();
         like.setUser(user);
