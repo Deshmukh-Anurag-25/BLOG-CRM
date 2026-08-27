@@ -3,6 +3,7 @@ package com.blogsphere.blogsphere.controller;
 import com.blogsphere.blogsphere.dto.PageRequest;
 import com.blogsphere.blogsphere.model.Page;
 import com.blogsphere.blogsphere.service.PageService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class PageController {
     }
 
     @PostMapping
-    public Page createPage(@RequestBody PageRequest request) {
+    public Page createPage(@Valid @RequestBody PageRequest request) {
         return pageService.createPage(request);
     }
 
@@ -32,7 +33,7 @@ public class PageController {
         return pageService.getPageById(id);
     }
 
-    @PutMapping("/{id}")
+    @PatchMapping("/{id}")
     public Page updatePage(@PathVariable Long id, @RequestBody PageRequest request) {
         return pageService.updatePage(id, request);
     }
