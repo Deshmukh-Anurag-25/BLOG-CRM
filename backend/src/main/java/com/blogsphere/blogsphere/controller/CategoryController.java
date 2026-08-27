@@ -3,6 +3,7 @@ package com.blogsphere.blogsphere.controller;
 import com.blogsphere.blogsphere.dto.CategoryRequest;
 import com.blogsphere.blogsphere.model.Category;
 import com.blogsphere.blogsphere.service.CategoryService;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,7 +19,7 @@ public class CategoryController {
     }
 
     @PostMapping
-    public Category createCategory(@RequestBody CategoryRequest request){
+    public Category createCategory(@Valid @RequestBody CategoryRequest request){
         return categoryService.createCategory(request);
     }
 
@@ -30,5 +31,15 @@ public class CategoryController {
     @GetMapping("/{id}")
     public Category getCategoryById(@PathVariable Long id){
         return categoryService.getCategoryById(id);
+    }
+
+    @PatchMapping("/{id}")
+    public Category updateCategory(@PathVariable Long id, @RequestBody CategoryRequest request) {
+        return categoryService.updateCategory(id, request);
+    }
+
+    @DeleteMapping("/{id}")
+    public void deleteCategory(@PathVariable Long id) {
+        categoryService.deleteCategory(id);
     }
 }
