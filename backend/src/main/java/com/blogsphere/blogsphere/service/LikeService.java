@@ -6,7 +6,7 @@ import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.LikeRepository;
 import com.blogsphere.blogsphere.repository.PostRepository;
-import com.blogsphere.blogsphere.repository.UserRepository;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,21 +14,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class LikeService {
     private final LikeRepository likeRepository;
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    public LikeService(LikeRepository likeRepository, PostRepository postRepository, UserRepository userRepository) {
+    public LikeService(LikeRepository likeRepository, PostRepository postRepository, CurrentUserProvider currentUserProvider) {
         this.likeRepository = likeRepository;
         this.postRepository = postRepository;
-        this.userRepository = userRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public Like likePost(Long postId){
-        if(likeRepository.findByUserIdAndPostId(1L, postId).isPresent()){
+        User user = currentUserProvider.getUser();
+
+        if(likeRepository.findByUserIdAndPostId(user.getId(), postId).isPresent()){
             throw new RuntimeException("Already Liked");
         }
 
-        User user = userRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
@@ -40,7 +40,8 @@ public class LikeService {
 
     @Transactional
     public void unlikePost(Long postId){
-        likeRepository.deleteByUserIdAndPostId(1L, postId);
+        User user = currentUserProvider.getUser();
+        likeRepository.deleteByUserIdAndPostId(user.getId(), postId);
     }
 
     public long getLikeCount(Long postId){
