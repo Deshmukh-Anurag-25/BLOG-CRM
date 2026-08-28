@@ -6,7 +6,7 @@ import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.BookmarkRepository;
 import com.blogsphere.blogsphere.repository.PostRepository;
-import com.blogsphere.blogsphere.repository.UserRepository;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,21 +14,20 @@ import org.springframework.transaction.annotation.Transactional;
 public class BookmarkService {
     private final BookmarkRepository bookmarkRepository;
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    public BookmarkService(BookmarkRepository bookmarkRepository, PostRepository postRepository, UserRepository userRepository) {
+    public BookmarkService(BookmarkRepository bookmarkRepository, PostRepository postRepository, CurrentUserProvider currentUserProvider) {
         this.bookmarkRepository = bookmarkRepository;
         this.postRepository = postRepository;
-        this.userRepository = userRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public Bookmark bookmarkPost(Long postId){
-        if(bookmarkRepository.findByUserIdAndPostId(1L, postId).isPresent()){
+        User user = currentUserProvider.getUser();
+        if(bookmarkRepository.findByUserIdAndPostId(user.getId(), postId).isPresent()){
             throw new RuntimeException("Already Added to bookmark");
         }
 
-        User user = userRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         Post post = postRepository.findById(postId)
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + postId));
 
@@ -41,7 +40,8 @@ public class BookmarkService {
 
     @Transactional
     public void removeBookmark(Long postId){
-        bookmarkRepository.deleteByUserIdAndPostId(1L, postId);
+        User user = currentUserProvider.getUser();
+        bookmarkRepository.deleteByUserIdAndPostId(user.getId(), postId);
     }
 
     public long getBookmarkCount(Long postId){
