@@ -36,6 +36,9 @@ public class User {
     private String profileImageUrl;
 
     @Enumerated(EnumType.STRING)
+    private Role role = Role.USER;
+
+    @Enumerated(EnumType.STRING)
     private UserStatus status = UserStatus.ACTIVE;
 
     private LocalDateTime createdAt;
