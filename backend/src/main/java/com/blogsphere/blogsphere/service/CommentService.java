@@ -8,6 +8,7 @@ import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.CommentRepository;
 import com.blogsphere.blogsphere.repository.PostRepository;
 import com.blogsphere.blogsphere.repository.UserRepository;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -16,12 +17,12 @@ public class CommentService {
 
     private final CommentRepository commentRepository;
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    public CommentService(CommentRepository commentRepository, PostRepository postRepository, UserRepository userRepository) {
+    public CommentService(CommentRepository commentRepository, PostRepository postRepository, CurrentUserProvider currentUserProvider) {
         this.commentRepository = commentRepository;
         this.postRepository = postRepository;
-        this.userRepository = userRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public Comments createComment(CommentRequest request){
@@ -32,8 +33,7 @@ public class CommentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Post not found with id: " + request.getPostId()));
         comment.setPost(post);
 
-        User author = userRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        User author = currentUserProvider.getUser();
         comment.setAuthor(author);
 
         return commentRepository.save(comment);
