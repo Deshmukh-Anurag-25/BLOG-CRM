@@ -5,6 +5,8 @@ import com.blogsphere.blogsphere.dto.PostRequest;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.*;
 import com.blogsphere.blogsphere.repository.*;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -16,17 +18,17 @@ import java.util.Set;
 public class PostService {
 
     private final PostRepository postRepository;
-    private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
     private final RevisionRepository revisionRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    public PostService(PostRepository postRepository, UserRepository userRepository, CategoryRepository categoryRepository, TagRepository tagRepository, RevisionRepository revisionRepository){
+    public PostService(PostRepository postRepository, CategoryRepository categoryRepository, TagRepository tagRepository, RevisionRepository revisionRepository, CurrentUserProvider currentUserProvider){
         this.postRepository = postRepository;
-        this.userRepository = userRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
         this.revisionRepository = revisionRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public Post createPost(PostRequest request){
@@ -36,7 +38,7 @@ public class PostService {
         post.setContent(request.getContent());
         post.setExcerpt(request.getExcerpt());
 
-        User author = userRepository.findById(1L).orElseThrow();
+        User author = currentUserProvider.getUser();
         post.setAuthor(author);
 
         if (request.getCategoryId() != null) {
@@ -69,7 +71,7 @@ public class PostService {
         revision.setPost(post);
         revision.setTitle(post.getTitle());
         revision.setContent(post.getContent());
-        revision.setEditedBy(userRepository.findById(1L).orElseThrow());
+        revision.setEditedBy(currentUserProvider.getUser());
         revisionRepository.save(revision);
 
         if (request.getTitle() != null) {
@@ -99,6 +101,15 @@ public class PostService {
 
     public void deletePost(Long id){
         Post post = getPostById(id);
+        User currentUser = currentUserProvider.getUser();
+
+        boolean isOwner = post.getAuthor().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to delete this post");
+        }
+
         postRepository.delete(post);
     }
 
