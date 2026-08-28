@@ -11,9 +11,9 @@ import java.util.UUID;
 @Entity
 @Getter
 @Setter
-@Table(name = "refresh_token")
+@Table(name = "refresh_tokens")
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class RefreshTokens {
+public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
