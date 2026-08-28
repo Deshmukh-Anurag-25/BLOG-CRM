@@ -5,6 +5,7 @@ import com.blogsphere.blogsphere.model.Follow;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.FollowRepository;
 import com.blogsphere.blogsphere.repository.UserRepository;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,23 +14,26 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final CurrentUserProvider currentUserProvider;
 
-    public FollowService(FollowRepository followRepository, UserRepository userRepository) {
+    public FollowService(FollowRepository followRepository, UserRepository userRepository, CurrentUserProvider currentUserProvider) {
         this.followRepository = followRepository;
         this.userRepository = userRepository;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public Follow followUser(Long followingId) {
-        if (followingId.equals(1L)) {
+
+        User follower = currentUserProvider.getUser();
+
+        if (followingId.equals(follower.getId())) {
             throw new RuntimeException("Cannot follow yourself");
         }
 
-        if (followRepository.findByFollowerIdAndFollowingId(1L, followingId).isPresent()) {
+        if (followRepository.findByFollowerIdAndFollowingId(follower.getId(), followingId).isPresent()) {
             throw new RuntimeException("Already following");
         }
 
-        User follower = userRepository.findById(1L)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         User following = userRepository.findById(followingId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + followingId));
 
@@ -42,7 +46,8 @@ public class FollowService {
 
     @Transactional
     public void unfollowUser(Long followingId) {
-        followRepository.deleteByFollowerIdAndFollowingId(1L, followingId);
+        User user = currentUserProvider.getUser();
+        followRepository.deleteByFollowerIdAndFollowingId(user.getId(), followingId);
     }
 
     public long getFollowerCount(Long userId) {
