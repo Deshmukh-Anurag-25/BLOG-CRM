@@ -1,4 +1,4 @@
-package com.blogsphere.blogsphere.security;
+package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.UserRepository;
@@ -24,8 +24,8 @@ public class CustomUserDetailService implements UserDetailsService {
 
         return org.springframework.security.core.userdetails.User.builder()
                 .username(user.getUsername())
-                .password((user.getPassword()))
-                .roles("USER")
+                .password(user.getPassword())
+                .roles(user.getRole().name())
                 .build();
     }
 }
