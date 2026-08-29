@@ -66,12 +66,19 @@ public class PostService {
 
     public Post updatePost(Long id, PostRequest request){
         Post post = getPostById(id);
+        User currentUser = currentUserProvider.getUser();
+
+        boolean isOwner = post.getAuthor().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to edit this post");
+        }
 
         Revision revision = new Revision();
         revision.setPost(post);
         revision.setTitle(post.getTitle());
         revision.setContent(post.getContent());
-        revision.setEditedBy(currentUserProvider.getUser());
+        revision.setEditedBy(currentUser);
         revisionRepository.save(revision);
 
         if (request.getTitle() != null) {
