@@ -4,6 +4,7 @@ import com.blogsphere.blogsphere.dto.CategoryRequest;
 import com.blogsphere.blogsphere.model.Category;
 import com.blogsphere.blogsphere.service.CategoryService;
 import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,11 +34,13 @@ public class CategoryController {
         return categoryService.getCategoryById(id);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PatchMapping("/{id}")
     public Category updateCategory(@PathVariable Long id, @RequestBody CategoryRequest request) {
         return categoryService.updateCategory(id, request);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public void deleteCategory(@PathVariable Long id) {
         categoryService.deleteCategory(id);
