@@ -2,8 +2,11 @@ package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.dto.UserRequest;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
+import com.blogsphere.blogsphere.model.Role;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.UserRepository;
+import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -14,10 +17,12 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final CurrentUserProvider currentUserProvider;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.currentUserProvider = currentUserProvider;
     }
 
     public User createUser(UserRequest request){
@@ -41,6 +46,13 @@ public class UserService {
 
     public User updateUser(Long id, UserRequest request) {
         User user = getUserById(id);
+        User currentUser = currentUserProvider.getUser();
+
+        boolean isSelf = user.getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isSelf && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to edit this user");
+        }
 
         if (request.getUsername() != null) {
             user.setUsername(request.getUsername());
@@ -60,6 +72,14 @@ public class UserService {
 
     public void deleteUser(Long id) {
         User user = getUserById(id);
+        User currentUser = currentUserProvider.getUser();
+
+        boolean isSelf = user.getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isSelf && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to delete this user");
+        }
+
         userRepository.delete(user);
     }
 

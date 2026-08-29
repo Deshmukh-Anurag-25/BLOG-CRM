@@ -4,11 +4,12 @@ import com.blogsphere.blogsphere.dto.CommentRequest;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.Comments;
 import com.blogsphere.blogsphere.model.Post;
+import com.blogsphere.blogsphere.model.Role;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.CommentRepository;
 import com.blogsphere.blogsphere.repository.PostRepository;
-import com.blogsphere.blogsphere.repository.UserRepository;
 import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
@@ -47,16 +48,30 @@ public class CommentService {
         Comments comment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + id));
 
+        User currentUser = currentUserProvider.getUser();
+        boolean isOwner = comment.getAuthor().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to edit this comment");
+        }
+
         if (request.getContent() != null) {
             comment.setContent(request.getContent());
         }
-
         return commentRepository.save(comment);
     }
 
     public void deleteComment(Long id) {
         Comments comment = commentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Comment not found with id: " + id));
+
+        User currentUser = currentUserProvider.getUser();
+        boolean isOwner = comment.getAuthor().getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to delete this comment");
+        }
+
         commentRepository.delete(comment);
     }
 }
