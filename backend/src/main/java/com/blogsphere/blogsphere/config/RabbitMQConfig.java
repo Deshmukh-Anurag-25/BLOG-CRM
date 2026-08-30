@@ -118,6 +118,12 @@ public class RabbitMQConfig {
     public static final String FOLLOW_CREATED_ROUTING_KEY = "follow.created";
     public static final String FOLLOW_DELETED_ROUTING_KEY = "follow.deleted";
 
+    public static final String USER_EXCHANGE = "user.exchange";
+
+    public static final String USER_DELETED_QUEUE = "user.deleted.queue";
+
+    public static final String USER_DELETED_ROUTING_KEY = "user.deleted";
+
 
     // ==============================
     // Exchange
@@ -461,6 +467,35 @@ public class RabbitMQConfig {
                 .bind(followDeletedQueue)
                 .to(followExchange)
                 .with(FOLLOW_DELETED_ROUTING_KEY);
+    }
+
+
+    // ==============================
+    // User Exchange / Queue / Binding
+    // ==============================
+
+    @Bean
+    public TopicExchange userExchange() {
+        return new TopicExchange(USER_EXCHANGE);
+    }
+
+    @Bean
+    public Queue userDeletedQueue() {
+        return new Queue(
+                USER_DELETED_QUEUE,
+                true
+        );
+    }
+
+    @Bean
+    public Binding userDeletedBinding(
+            Queue userDeletedQueue,
+            TopicExchange userExchange) {
+
+        return BindingBuilder
+                .bind(userDeletedQueue)
+                .to(userExchange)
+                .with(USER_DELETED_ROUTING_KEY);
     }
 
 
