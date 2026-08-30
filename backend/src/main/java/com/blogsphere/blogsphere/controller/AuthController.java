@@ -4,6 +4,7 @@ import com.blogsphere.blogsphere.dto.*;
 import com.blogsphere.blogsphere.model.RefreshToken;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.security.JwtUtil;
+import com.blogsphere.blogsphere.service.EmailService;
 import com.blogsphere.blogsphere.service.RefreshTokenService;
 import com.blogsphere.blogsphere.service.UserService;
 import jakarta.validation.Valid;
@@ -19,13 +20,15 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final UserService userService;
     private final RefreshTokenService refreshTokenService;
+    private final EmailService emailService;
 
     public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil,
-                          UserService userService, RefreshTokenService refreshTokenService) {
+                          UserService userService, RefreshTokenService refreshTokenService, EmailService emailService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
         this.userService = userService;
         this.refreshTokenService = refreshTokenService;
+        this.emailService = emailService;
     }
 
     @PostMapping("/register")
@@ -42,6 +45,8 @@ public class AuthController {
         User user = userService.getUserByUsername(request.getUsername());
         String accessToken = jwtUtil.generateToken(request.getUsername());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
+
+        emailService.sendLoginAlertEmail(user);
 
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
