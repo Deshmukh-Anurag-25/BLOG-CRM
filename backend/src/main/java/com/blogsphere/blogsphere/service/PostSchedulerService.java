@@ -13,9 +13,11 @@ import java.util.List;
 public class PostSchedulerService {
 
     private final PostRepository postRepository;
+    private final PostService postService;
 
-    public PostSchedulerService(PostRepository postRepository) {
+    public PostSchedulerService(PostRepository postRepository, PostService postService) {
         this.postRepository = postRepository;
+        this.postService = postService;
     }
 
     @Scheduled(fixedRate = 60000)
@@ -25,7 +27,10 @@ public class PostSchedulerService {
 
         for (Post post : duePosts) {
             post.setStatus(PostStatus.PUBLISHED);
-            postRepository.save(post);
+            Post publishedPost = postRepository.save(post);
+
+            postService.notifyFollowersOfPublish(publishedPost);
+            postService.publishDueScheduledPostEvent(publishedPost);
         }
     }
 }
