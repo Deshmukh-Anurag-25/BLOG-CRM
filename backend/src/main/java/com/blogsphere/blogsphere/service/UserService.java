@@ -1,14 +1,32 @@
 package com.blogsphere.blogsphere.service;
 
+import com.blogsphere.blogsphere.config.RabbitMQConfig;
 import com.blogsphere.blogsphere.dto.UserRequest;
+import com.blogsphere.blogsphere.event.EventEnvelope;
+import com.blogsphere.blogsphere.event.FollowPayload;
+import com.blogsphere.blogsphere.event.UserPostPayload;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
+import com.blogsphere.blogsphere.model.Comments;
+import com.blogsphere.blogsphere.model.Follow;
+import com.blogsphere.blogsphere.model.Like;
+import com.blogsphere.blogsphere.model.Bookmark;
+import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.Role;
 import com.blogsphere.blogsphere.model.User;
+import com.blogsphere.blogsphere.repository.BookmarkRepository;
+import com.blogsphere.blogsphere.repository.CommentRepository;
+import com.blogsphere.blogsphere.repository.FollowRepository;
+import com.blogsphere.blogsphere.repository.LikeRepository;
+import com.blogsphere.blogsphere.repository.PostRepository;
+import com.blogsphere.blogsphere.repository.RefreshTokenRepository;
+import com.blogsphere.blogsphere.repository.RevisionRepository;
 import com.blogsphere.blogsphere.repository.UserRepository;
 import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -18,11 +36,33 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final CurrentUserProvider currentUserProvider;
+    private final PostRepository postRepository;
+    private final CommentRepository commentRepository;
+    private final LikeRepository likeRepository;
+    private final BookmarkRepository bookmarkRepository;
+    private final FollowRepository followRepository;
+    private final RevisionRepository revisionRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final RabbitTemplate rabbitTemplate;
+    private final EmailService emailService;
 
-    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider) {
+    public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider,
+                       PostRepository postRepository, CommentRepository commentRepository, LikeRepository likeRepository,
+                       BookmarkRepository bookmarkRepository, FollowRepository followRepository,
+                       RevisionRepository revisionRepository, RefreshTokenRepository refreshTokenRepository,
+                       RabbitTemplate rabbitTemplate, EmailService emailService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.currentUserProvider = currentUserProvider;
+        this.postRepository = postRepository;
+        this.commentRepository = commentRepository;
+        this.likeRepository = likeRepository;
+        this.bookmarkRepository = bookmarkRepository;
+        this.followRepository = followRepository;
+        this.revisionRepository = revisionRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.rabbitTemplate = rabbitTemplate;
+        this.emailService = emailService;
     }
 
     public User createUser(UserRequest request){
@@ -32,7 +72,11 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setDisplayName(request.getDisplayName());
 
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+
+        emailService.sendWelcomeEmail(savedUser);
+
+        return savedUser;
     }
 
     public List<User> getAll(){
@@ -70,6 +114,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Transactional
     public void deleteUser(Long id) {
         User user = getUserById(id);
         User currentUser = currentUserProvider.getUser();
@@ -80,7 +125,82 @@ public class UserService {
             throw new AccessDeniedException("You don't have permission to delete this user");
         }
 
+        Long userId = user.getId();
+
+        // --- Posts this user authored, and everything attached to them ---
+        List<Post> ownedPosts = postRepository.findByAuthorId(userId);
+        for (Post post : ownedPosts) {
+            Long postId = post.getId();
+
+            for (Comments comment : commentRepository.findByPostId(postId)) {
+                publish(RabbitMQConfig.COMMENT_EXCHANGE, RabbitMQConfig.COMMENT_DELETED_ROUTING_KEY,
+                        new EventEnvelope<>("COMMENT_DELETED", comment.getId()));
+            }
+            for (Like like : likeRepository.findByPostId(postId)) {
+                publish(RabbitMQConfig.LIKE_EXCHANGE, RabbitMQConfig.LIKE_DELETED_ROUTING_KEY,
+                        new EventEnvelope<>("LIKE_DELETED", new UserPostPayload(like.getUser().getId(), postId)));
+            }
+            for (Bookmark bookmark : bookmarkRepository.findByPostId(postId)) {
+                publish(RabbitMQConfig.BOOKMARK_EXCHANGE, RabbitMQConfig.BOOKMARK_DELETED_ROUTING_KEY,
+                        new EventEnvelope<>("BOOKMARK_DELETED", new UserPostPayload(bookmark.getUser().getId(), postId)));
+            }
+
+            revisionRepository.deleteByPostId(postId);
+            commentRepository.deleteByPostId(postId);
+            likeRepository.deleteByPostId(postId);
+            bookmarkRepository.deleteByPostId(postId);
+
+            publish(RabbitMQConfig.POST_EXCHANGE, RabbitMQConfig.POST_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("POST_DELETED", postId));
+        }
+        postRepository.deleteAll(ownedPosts);
+
+        // --- This user's activity on other people's posts ---
+        for (Comments comment : commentRepository.findByAuthorId(userId)) {
+            publish(RabbitMQConfig.COMMENT_EXCHANGE, RabbitMQConfig.COMMENT_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("COMMENT_DELETED", comment.getId()));
+        }
+        commentRepository.deleteByAuthorId(userId);
+
+        for (Like like : likeRepository.findByUserId(userId)) {
+            publish(RabbitMQConfig.LIKE_EXCHANGE, RabbitMQConfig.LIKE_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("LIKE_DELETED", new UserPostPayload(userId, like.getPost().getId())));
+        }
+        likeRepository.deleteByUserId(userId);
+
+        for (Bookmark bookmark : bookmarkRepository.findByUserId(userId)) {
+            publish(RabbitMQConfig.BOOKMARK_EXCHANGE, RabbitMQConfig.BOOKMARK_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("BOOKMARK_DELETED", new UserPostPayload(userId, bookmark.getPost().getId())));
+        }
+        bookmarkRepository.deleteByUserId(userId);
+
+        revisionRepository.deleteByEditedById(userId);
+
+        // --- Follow relationships, both directions ---
+        for (Follow follow : followRepository.findByFollowerId(userId)) {
+            publish(RabbitMQConfig.FOLLOW_EXCHANGE, RabbitMQConfig.FOLLOW_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("FOLLOW_DELETED", new FollowPayload(userId, follow.getFollowing().getId())));
+        }
+        for (Follow follow : followRepository.findByFollowingId(userId)) {
+            publish(RabbitMQConfig.FOLLOW_EXCHANGE, RabbitMQConfig.FOLLOW_DELETED_ROUTING_KEY,
+                    new EventEnvelope<>("FOLLOW_DELETED", new FollowPayload(follow.getFollower().getId(), userId)));
+        }
+        followRepository.deleteByFollowerId(userId);
+        followRepository.deleteByFollowingId(userId);
+
+        // --- Auth artifacts (no event needed) ---
+        refreshTokenRepository.deleteByUserId(userId);
+
+        emailService.sendAccountDeletedEmail(user);
+
         userRepository.delete(user);
+
+        publish(RabbitMQConfig.USER_EXCHANGE, RabbitMQConfig.USER_DELETED_ROUTING_KEY,
+                new EventEnvelope<>("USER_DELETED", userId));
+    }
+
+    private void publish(String exchange, String routingKey, EventEnvelope<?> event) {
+        rabbitTemplate.convertAndSend(exchange, routingKey, event);
     }
 
     public User getUserByUsername(String username) {
