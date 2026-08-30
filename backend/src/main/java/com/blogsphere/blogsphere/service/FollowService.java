@@ -1,11 +1,15 @@
 package com.blogsphere.blogsphere.service;
 
+import com.blogsphere.blogsphere.config.RabbitMQConfig;
+import com.blogsphere.blogsphere.event.EventEnvelope;
+import com.blogsphere.blogsphere.event.FollowPayload;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.Follow;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.repository.FollowRepository;
 import com.blogsphere.blogsphere.repository.UserRepository;
 import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +19,15 @@ public class FollowService {
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final RabbitTemplate rabbitTemplate;
+    private final EmailService emailService;
 
-    public FollowService(FollowRepository followRepository, UserRepository userRepository, CurrentUserProvider currentUserProvider) {
+    public FollowService(FollowRepository followRepository, UserRepository userRepository, CurrentUserProvider currentUserProvider, RabbitTemplate rabbitTemplate, EmailService emailService) {
         this.followRepository = followRepository;
         this.userRepository = userRepository;
         this.currentUserProvider = currentUserProvider;
+        this.rabbitTemplate = rabbitTemplate;
+        this.emailService = emailService;
     }
 
     public Follow followUser(Long followingId) {
@@ -41,13 +49,37 @@ public class FollowService {
         follow.setFollower(follower);
         follow.setFollowing(following);
 
-        return followRepository.save(follow);
+        Follow savedFollow = followRepository.save(follow);
+
+        emailService.sendNewFollowerEmail(following, follower);
+
+        EventEnvelope<FollowPayload> event = new EventEnvelope<>("FOLLOW_CREATED", new FollowPayload(follower.getId(), followingId));
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.FOLLOW_EXCHANGE,
+                RabbitMQConfig.FOLLOW_CREATED_ROUTING_KEY,
+                event
+        );
+
+        return savedFollow;
     }
 
     @Transactional
     public void unfollowUser(Long followingId) {
         User user = currentUserProvider.getUser();
+
+        boolean existed = followRepository.findByFollowerIdAndFollowingId(user.getId(), followingId).isPresent();
+        if (!existed) {
+            return;
+        }
+
         followRepository.deleteByFollowerIdAndFollowingId(user.getId(), followingId);
+
+        EventEnvelope<FollowPayload> event = new EventEnvelope<>("FOLLOW_DELETED", new FollowPayload(user.getId(), followingId));
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.FOLLOW_EXCHANGE,
+                RabbitMQConfig.FOLLOW_DELETED_ROUTING_KEY,
+                event
+        );
     }
 
     public long getFollowerCount(Long userId) {
