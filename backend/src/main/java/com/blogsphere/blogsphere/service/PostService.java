@@ -1,13 +1,17 @@
 package com.blogsphere.blogsphere.service;
 
+import com.blogsphere.blogsphere.config.RabbitMQConfig;
 import com.blogsphere.blogsphere.dto.AutosaveRequest;
 import com.blogsphere.blogsphere.dto.PostRequest;
+import com.blogsphere.blogsphere.event.EventEnvelope;
 import com.blogsphere.blogsphere.exception.ResourceNotFoundException;
 import com.blogsphere.blogsphere.model.*;
 import com.blogsphere.blogsphere.repository.*;
 import com.blogsphere.blogsphere.security.CurrentUserProvider;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
@@ -21,14 +25,22 @@ public class PostService {
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
     private final RevisionRepository revisionRepository;
+    private final FollowRepository followRepository;
     private final CurrentUserProvider currentUserProvider;
+    private final RabbitTemplate rabbitTemplate;
+    private final EmailService emailService;
 
-    public PostService(PostRepository postRepository, CategoryRepository categoryRepository, TagRepository tagRepository, RevisionRepository revisionRepository, CurrentUserProvider currentUserProvider){
+    public PostService(PostRepository postRepository, CategoryRepository categoryRepository, TagRepository tagRepository,
+                       RevisionRepository revisionRepository, FollowRepository followRepository,
+                       CurrentUserProvider currentUserProvider, RabbitTemplate rabbitTemplate, EmailService emailService){
         this.postRepository = postRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
         this.revisionRepository = revisionRepository;
+        this.followRepository = followRepository;
         this.currentUserProvider = currentUserProvider;
+        this.rabbitTemplate = rabbitTemplate;
+        this.emailService = emailService;
     }
 
     public Post createPost(PostRequest request){
@@ -52,7 +64,18 @@ public class PostService {
             post.setTags(tags);
         }
 
-        return postRepository.save(post);
+        Post savedPost = postRepository.save(post);
+
+        emailService.sendPostCreatedEmail(author, savedPost);
+
+        EventEnvelope<Long> event = new EventEnvelope<>("POST_CREATED", savedPost.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_CREATED_ROUTING_KEY,
+                event
+        );
+
+        return savedPost;
     }
 
     public List<Post> getAll(){
@@ -103,9 +126,19 @@ public class PostService {
             post.setTags(tags);
         }
 
-        return postRepository.save(post);
+        Post updatedPost = postRepository.save(post);
+
+        EventEnvelope<Long> updatedEvent = new EventEnvelope<>("POST_UPDATED", updatedPost.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_UPDATED_ROUTING_KEY,
+                updatedEvent
+        );
+
+        return updatedPost;
     }
 
+    @Transactional
     public void deletePost(Long id){
         Post post = getPostById(id);
         User currentUser = currentUserProvider.getUser();
@@ -117,25 +150,64 @@ public class PostService {
             throw new AccessDeniedException("You don't have permission to delete this post");
         }
 
+        Long deletedPostId = post.getId();
+
+        revisionRepository.deleteByPostId(deletedPostId);
         postRepository.delete(post);
+
+        EventEnvelope<Long> deletedEvent = new EventEnvelope<>("POST_DELETED", deletedPostId);
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_DELETED_ROUTING_KEY,
+                deletedEvent
+        );
     }
 
     public Post publishPost(Long id){
         Post post = getPostById(id);
         post.setStatus(PostStatus.PUBLISHED);
-        return postRepository.save(post);
+        Post publishedPost = postRepository.save(post);
+
+        notifyFollowersOfPublish(publishedPost);
+
+        EventEnvelope<Long> event = new EventEnvelope<>("POST_PUBLISHED", publishedPost.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_PUBLISHED_ROUTING_KEY,
+                event
+        );
+
+        return publishedPost;
     }
 
     public Post unpublishPost(Long id){
         Post post = getPostById(id);
         post.setStatus(PostStatus.DRAFT);
-        return postRepository.save(post);
+        Post unpublishedPost = postRepository.save(post);
+
+        EventEnvelope<Long> event = new EventEnvelope<>("POST_UNPUBLISHED", unpublishedPost.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_UNPUBLISHED_ROUTING_KEY,
+                event
+        );
+
+        return unpublishedPost;
     }
 
     public Post archivePost(Long id){
         Post post = getPostById(id);
         post.setStatus(PostStatus.ARCHIVED);
-        return postRepository.save(post);
+        Post archivedPost = postRepository.save(post);
+
+        EventEnvelope<Long> event = new EventEnvelope<>("POST_ARCHIVED", archivedPost.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_ARCHIVED_ROUTING_KEY,
+                event
+        );
+
+        return archivedPost;
     }
 
     public List<Revision> getRevisions(Long postId) {
@@ -154,5 +226,26 @@ public class PostService {
         post.setScheduledAt(scheduledAt);
         post.setStatus(PostStatus.SCHEDULED);
         return postRepository.save(post);
+    }
+
+    /**
+     * Notifies everyone who follows the post's author that a new post is live.
+     * Called both from the direct publish path and from PostSchedulerService
+     * when a scheduled post actually goes live.
+     */
+    public void notifyFollowersOfPublish(Post post) {
+        User author = post.getAuthor();
+        for (Follow follow : followRepository.findByFollowingId(author.getId())) {
+            emailService.sendNewPostFromFollowedUserEmail(follow.getFollower(), author, post);
+        }
+    }
+
+    public void publishDueScheduledPostEvent(Post post) {
+        EventEnvelope<Long> event = new EventEnvelope<>("POST_PUBLISHED", post.getId());
+        rabbitTemplate.convertAndSend(
+                RabbitMQConfig.POST_EXCHANGE,
+                RabbitMQConfig.POST_PUBLISHED_ROUTING_KEY,
+                event
+        );
     }
 }
