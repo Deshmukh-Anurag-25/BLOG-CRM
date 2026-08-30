@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface RevisionRepository extends JpaRepository<Revision, Long> {
     List<Revision> findByPostIdOrderByCreatedAtDesc(Long postId);
+    void deleteByPostId(Long postId);
+    void deleteByEditedById(Long editedById);
 }
