@@ -9,4 +9,5 @@ import java.util.List;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
     List<Post> findByStatusAndScheduledAtBefore(PostStatus status, LocalDateTime time);
+    List<Post> findByAuthorId(Long authorId);
 }
