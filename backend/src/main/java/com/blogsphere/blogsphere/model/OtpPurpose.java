@@ -1,4 +1,6 @@
 package com.blogsphere.blogsphere.model;
 
-public class OtpPurpose {
+public enum OtpPurpose {
+    REGISTRATION,
+    ACCOUNT_DELETION
 }
