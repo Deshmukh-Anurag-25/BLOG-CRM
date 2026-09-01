@@ -66,7 +66,7 @@ public class PostService {
 
         Post savedPost = postRepository.save(post);
 
-        emailService.sendPostCreatedEmail(author, savedPost);
+        emailService.sendPostCreatedEmail(author.getEmail(), author.getDisplayName(), savedPost.getTitle());
 
         EventEnvelope<Long> event = new EventEnvelope<>("POST_CREATED", savedPost.getId());
         rabbitTemplate.convertAndSend(
@@ -233,10 +233,19 @@ public class PostService {
      * Called both from the direct publish path and from PostSchedulerService
      * when a scheduled post actually goes live.
      */
+    @Transactional
     public void notifyFollowersOfPublish(Post post) {
         User author = post.getAuthor();
+        String authorDisplayName = author.getDisplayName();
+        String authorUsername = author.getUsername();
+        String postTitle = post.getTitle();
+
         for (Follow follow : followRepository.findByFollowingId(author.getId())) {
-            emailService.sendNewPostFromFollowedUserEmail(follow.getFollower(), author, post);
+            User follower = follow.getFollower();
+            emailService.sendNewPostFromFollowedUserEmail(
+                    follower.getEmail(), follower.getDisplayName(),
+                    authorDisplayName, authorUsername, postTitle
+            );
         }
     }
 
