@@ -1,5 +1,7 @@
 package com.blogsphere.blogsphere.controller;
 
+import com.blogsphere.blogsphere.dto.AccountDeletionConfirmRequest;
+import com.blogsphere.blogsphere.dto.MessageResponse;
 import com.blogsphere.blogsphere.dto.UserRequest;
 import com.blogsphere.blogsphere.model.User;
 import com.blogsphere.blogsphere.service.UserService;
@@ -39,7 +41,20 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
+    public MessageResponse requestAccountDeletion(@PathVariable Long id) {
+        userService.requestAccountDeletion(id);
+        return new MessageResponse("A verification code has been sent to confirm account deletion.");
+    }
+
+    @PostMapping("/{id}/resend-deletion-otp")
+    public MessageResponse resendAccountDeletionOtp(@PathVariable Long id) {
+        userService.requestAccountDeletion(id);
+        return new MessageResponse("A new verification code has been sent to confirm account deletion.");
+    }
+
+    @PostMapping("/{id}/confirm-deletion")
+    public MessageResponse confirmAccountDeletion(@PathVariable Long id, @Valid @RequestBody AccountDeletionConfirmRequest request) {
+        userService.confirmAccountDeletion(id, request.getOtp());
+        return new MessageResponse("Account deleted successfully.");
     }
 }
