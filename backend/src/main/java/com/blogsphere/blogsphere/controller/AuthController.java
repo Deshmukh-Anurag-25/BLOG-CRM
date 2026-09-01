@@ -31,9 +31,21 @@ public class AuthController {
         this.emailService = emailService;
     }
 
-    @PostMapping("/register")
-    public User register(@Valid @RequestBody UserRequest request) {
-        return userService.createUser(request);
+    @PostMapping("/register/initiate")
+    public MessageResponse registerInitiate(@Valid @RequestBody UserRequest request) {
+        userService.initiateRegistration(request);
+        return new MessageResponse("A verification code has been sent to " + request.getEmail() + ". Verify it to complete registration.");
+    }
+
+    @PostMapping("/register/verify")
+    public User registerVerify(@Valid @RequestBody OtpVerifyRequest request) {
+        return userService.completeRegistration(request);
+    }
+
+    @PostMapping("/register/resend-otp")
+    public MessageResponse registerResendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        userService.resendRegistrationOtp(request.getEmail());
+        return new MessageResponse("A new verification code has been sent to " + request.getEmail() + ".");
     }
 
     @PostMapping("/login")
@@ -46,7 +58,7 @@ public class AuthController {
         String accessToken = jwtUtil.generateToken(request.getUsername());
         RefreshToken refreshToken = refreshTokenService.createRefreshToken(user);
 
-        emailService.sendLoginAlertEmail(user);
+        emailService.sendLoginAlertEmail(user.getEmail(), user.getDisplayName(), user.getUsername());
 
         return new AuthResponse(accessToken, refreshToken.getToken());
     }
