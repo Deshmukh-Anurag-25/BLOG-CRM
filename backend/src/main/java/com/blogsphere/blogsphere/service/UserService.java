@@ -1,6 +1,7 @@
 package com.blogsphere.blogsphere.service;
 
 import com.blogsphere.blogsphere.config.RabbitMQConfig;
+import com.blogsphere.blogsphere.dto.OtpVerifyRequest;
 import com.blogsphere.blogsphere.dto.UserRequest;
 import com.blogsphere.blogsphere.event.EventEnvelope;
 import com.blogsphere.blogsphere.event.FollowPayload;
@@ -10,6 +11,8 @@ import com.blogsphere.blogsphere.model.Comments;
 import com.blogsphere.blogsphere.model.Follow;
 import com.blogsphere.blogsphere.model.Like;
 import com.blogsphere.blogsphere.model.Bookmark;
+import com.blogsphere.blogsphere.model.OtpPurpose;
+import com.blogsphere.blogsphere.model.PendingRegistration;
 import com.blogsphere.blogsphere.model.Post;
 import com.blogsphere.blogsphere.model.Role;
 import com.blogsphere.blogsphere.model.User;
@@ -17,6 +20,7 @@ import com.blogsphere.blogsphere.repository.BookmarkRepository;
 import com.blogsphere.blogsphere.repository.CommentRepository;
 import com.blogsphere.blogsphere.repository.FollowRepository;
 import com.blogsphere.blogsphere.repository.LikeRepository;
+import com.blogsphere.blogsphere.repository.PendingRegistrationRepository;
 import com.blogsphere.blogsphere.repository.PostRepository;
 import com.blogsphere.blogsphere.repository.RefreshTokenRepository;
 import com.blogsphere.blogsphere.repository.RevisionRepository;
@@ -45,12 +49,15 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final RabbitTemplate rabbitTemplate;
     private final EmailService emailService;
+    private final OtpService otpService;
+    private final PendingRegistrationRepository pendingRegistrationRepository;
 
     public UserService(UserRepository userRepository, PasswordEncoder passwordEncoder, CurrentUserProvider currentUserProvider,
                        PostRepository postRepository, CommentRepository commentRepository, LikeRepository likeRepository,
                        BookmarkRepository bookmarkRepository, FollowRepository followRepository,
                        RevisionRepository revisionRepository, RefreshTokenRepository refreshTokenRepository,
-                       RabbitTemplate rabbitTemplate, EmailService emailService) {
+                       RabbitTemplate rabbitTemplate, EmailService emailService,
+                       OtpService otpService, PendingRegistrationRepository pendingRegistrationRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.currentUserProvider = currentUserProvider;
@@ -63,6 +70,61 @@ public class UserService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.rabbitTemplate = rabbitTemplate;
         this.emailService = emailService;
+        this.otpService = otpService;
+        this.pendingRegistrationRepository = pendingRegistrationRepository;
+    }
+
+    @Transactional
+    public void initiateRegistration(UserRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new IllegalArgumentException("Username is already taken");
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException("Email is already registered");
+        }
+
+        // Overwrite any previous unfinished registration attempt for this email.
+        pendingRegistrationRepository.deleteByEmail(request.getEmail());
+
+        PendingRegistration pending = new PendingRegistration();
+        pending.setUsername(request.getUsername());
+        pending.setEmail(request.getEmail());
+        pending.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+        pending.setDisplayName(request.getDisplayName());
+        pending.setBio(request.getBio());
+        pendingRegistrationRepository.save(pending);
+
+        otpService.generateAndSendOtp(request.getEmail(), OtpPurpose.REGISTRATION, "complete your registration");
+    }
+
+    public void resendRegistrationOtp(String email) {
+        pendingRegistrationRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("No pending registration for this email"));
+
+        otpService.generateAndSendOtp(email, OtpPurpose.REGISTRATION, "complete your registration");
+    }
+
+    @Transactional
+    public User completeRegistration(OtpVerifyRequest request) {
+        otpService.verifyOtp(request.getEmail(), request.getOtp(), OtpPurpose.REGISTRATION);
+
+        PendingRegistration pending = pendingRegistrationRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("No pending registration for this email"));
+
+        User user = new User();
+        user.setUsername(pending.getUsername());
+        user.setEmail(pending.getEmail());
+        user.setPassword(pending.getPasswordHash());
+        user.setDisplayName(pending.getDisplayName());
+        user.setBio(pending.getBio());
+
+        User savedUser = userRepository.save(user);
+
+        pendingRegistrationRepository.delete(pending);
+
+        emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getDisplayName(), savedUser.getUsername());
+
+        return savedUser;
     }
 
     public User createUser(UserRequest request){
@@ -74,7 +136,7 @@ public class UserService {
 
         User savedUser = userRepository.save(user);
 
-        emailService.sendWelcomeEmail(savedUser);
+        emailService.sendWelcomeEmail(savedUser.getEmail(), savedUser.getDisplayName(), savedUser.getUsername());
 
         return savedUser;
     }
@@ -114,8 +176,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    @Transactional
-    public void deleteUser(Long id) {
+    public void requestAccountDeletion(Long id) {
         User user = getUserById(id);
         User currentUser = currentUserProvider.getUser();
 
@@ -125,6 +186,26 @@ public class UserService {
             throw new AccessDeniedException("You don't have permission to delete this user");
         }
 
+        otpService.generateAndSendOtp(user.getEmail(), OtpPurpose.ACCOUNT_DELETION, "confirm deleting your account");
+    }
+
+    @Transactional
+    public void confirmAccountDeletion(Long id, String otp) {
+        User user = getUserById(id);
+        User currentUser = currentUserProvider.getUser();
+
+        boolean isSelf = user.getId().equals(currentUser.getId());
+        boolean isAdmin = currentUser.getRole() == Role.ADMIN;
+        if (!isSelf && !isAdmin) {
+            throw new AccessDeniedException("You don't have permission to delete this user");
+        }
+
+        otpService.verifyOtp(user.getEmail(), otp, OtpPurpose.ACCOUNT_DELETION);
+
+        performDeletion(user);
+    }
+
+    private void performDeletion(User user) {
         Long userId = user.getId();
 
         // --- Posts this user authored, and everything attached to them ---
@@ -191,7 +272,7 @@ public class UserService {
         // --- Auth artifacts (no event needed) ---
         refreshTokenRepository.deleteByUserId(userId);
 
-        emailService.sendAccountDeletedEmail(user);
+        emailService.sendAccountDeletedEmail(user.getEmail(), user.getDisplayName(), user.getUsername());
 
         userRepository.delete(user);
 

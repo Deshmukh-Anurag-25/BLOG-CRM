@@ -51,7 +51,8 @@ public class FollowService {
 
         Follow savedFollow = followRepository.save(follow);
 
-        emailService.sendNewFollowerEmail(following, follower);
+        emailService.sendNewFollowerEmail(following.getEmail(), following.getDisplayName(),
+                follower.getDisplayName(), follower.getUsername());
 
         EventEnvelope<FollowPayload> event = new EventEnvelope<>("FOLLOW_CREATED", new FollowPayload(follower.getId(), followingId));
         rabbitTemplate.convertAndSend(

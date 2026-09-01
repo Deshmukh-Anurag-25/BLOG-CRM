@@ -48,7 +48,8 @@ public class CommentService {
 
         User postAuthor = post.getAuthor();
         if (!postAuthor.getId().equals(author.getId())) {
-            emailService.sendNewCommentEmail(postAuthor, author, post.getTitle());
+            emailService.sendNewCommentEmail(postAuthor.getEmail(), postAuthor.getDisplayName(),
+                    author.getDisplayName(), author.getUsername(), post.getTitle());
         }
 
         EventEnvelope<Long> event = new EventEnvelope<>("COMMENT_CREATED", savedComment.getId());

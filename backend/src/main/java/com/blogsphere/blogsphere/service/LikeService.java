@@ -47,7 +47,8 @@ public class LikeService {
 
         User postAuthor = post.getAuthor();
         if (!postAuthor.getId().equals(user.getId())) {
-            emailService.sendNewLikeEmail(postAuthor, user, post.getTitle());
+            emailService.sendNewLikeEmail(postAuthor.getEmail(), postAuthor.getDisplayName(),
+                    user.getDisplayName(), user.getUsername(), post.getTitle());
         }
 
         EventEnvelope<UserPostPayload> event = new EventEnvelope<>("LIKE_CREATED", new UserPostPayload(user.getId(), postId));
